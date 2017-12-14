@@ -9,7 +9,9 @@ class App extends Component {
       username: ''
     }
   }
-  handleChange(e) {
+
+
+  handleChange = (e) => {
     console.log(e.target.name);
     this.setState({
       [e.target.name]: e.target.value
