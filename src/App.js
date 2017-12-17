@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import './App.css';
-import firebase from './configs/FirebaseConfig.js'
+import firebase, { provider, auth } from './configs/FirebaseConfig.js'
 
 class App extends Component {
   constructor(){
@@ -8,10 +8,16 @@ class App extends Component {
     this.state = {
       currentItem: '',
       username: '',
-      items: []
+      items: [],
+      user: null
     }
   }
   componentDidMount(){
+    auth.onAuthStateChanged((user)=> {
+      if (user) {
+        this.setState({user});
+      }
+    });
     const itemsRef = firebase.database().ref('items');
     itemsRef.on('value', (snapshot) => {
       let items = snapshot.val();
@@ -25,8 +31,8 @@ class App extends Component {
       }
       this.setState({
         items: newState
-      })
-    })
+      });
+    });
   }
 
   handleChange = (e) => {
@@ -45,7 +51,7 @@ class App extends Component {
       const itemsRef = firebase.database().ref('items');
       const item = {
         title: this.state.currentItem,
-        user: this.state.username
+        user: this.state.user.displayName || this.state.user.email
       }
       itemsRef.push(item);
       this.setState({
@@ -54,22 +60,60 @@ class App extends Component {
       });
   }
   
+  login = () => {
+    auth.signInWithPopup(provider)
+    .then((result) => {
+      const user = result.user
+      this.setState({
+        user
+      });
+    })
+  }
+
+  logout = () => {
+  auth.signOut()
+    .then(() => {
+      this.setState({
+        user: null
+      });
+    });
+    document.location.reload(true);
+  }
+  
   render() {
     return (
       <div className='app'>
         <header>
-            <div className='wrapper'>
-              <h1>Fun Food Friends</h1>     
-            </div>
+          <div className="wrapper">
+            <h1>Fun Food Friends</h1>
+            {this.state.user ?
+              <button onClick={this.logout}>Logout</button>                
+              :
+              <button onClick={this.login}>Log In</button>              
+            }
+          </div>
         </header>
-        <div className='container'>
-          <section className='add-item'>
-              <form onSubmit={this.handleSubmit}>
-                <input type="text" name="username" placeholder="What's your name?" onChange= {this.handleChange} value = {this.state.username} />
-                <input type="text" name="currentItem" placeholder="What are you bringing?" onChange= {this.handleChange} value = {this.state.currentItem} />
-                <button>Add Item</button>
-              </form>
-          </section>
+        {this.state.user ?
+          <div>
+            <div className='user-profile'>
+              <img src={this.state.user.photoURL}/>
+            </div>
+            <div className='container'>
+              <section className='add-item'>
+                <form onSubmit={this.handleSubmit}>
+                  <input type="text" name="username" placeholder="What's your name?" value={this.state.user.displayName || this.state.user.email} />
+                  <input type="text" name="currentItem" placeholder="What are you bringing?" onChange={this.handleChange} value={this.state.currentItem} />
+                  <button>Add Item</button>
+                </form>
+              </section>
+            </div>
+          </div>
+          :
+          <div className='wrapper'>
+            <p>You must be logged in to see the potluck list and submit to it.</p>
+          </div>
+        }
+        
           <section className='display-item'>
             <div className="wrapper">
               <ul>
@@ -77,8 +121,10 @@ class App extends Component {
                   return (
                     <li key={item.id}>
                       <h3>{item.title}</h3>
-                      <p>brought by: {item.user}</p>
-                      <button onClick={() => this.removeItem(item.id)}>Remove Item</button>
+                      <p>brought by: {item.user}
+                      {item.user === this.state.user.displayName || item.user === this.state.user.email ?
+                      <button onClick={() => this.removeItem(item.id)}>Remove Item</button> : null}
+                      </p>
                     </li>
                   )
                 })}
@@ -86,7 +132,6 @@ class App extends Component {
             </div>
           </section>
         </div>
-      </div>
     );
   }
 }
